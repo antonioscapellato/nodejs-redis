@@ -86,4 +86,4 @@ Returns a JSON object with selected GitHub user fields:
 - `avatar_url`
 
 ## License
-MIT 
+This project is licensed under the [MIT License](LICENSE). 
