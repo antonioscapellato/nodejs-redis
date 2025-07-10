@@ -1,6 +1,6 @@
 # Node.js + Redis: GitHub User Caching API
 
-> **Inspiration:** This project is inspired by [this YouTube video](https://www.youtube.com/watch?v=oaJq1mQ3dFI).
+> **Inspiration:** This project is inspired by [Traversy Media on YouTube](https://www.youtube.com/@TraversyMedia) and the [original GitHub Gist by Brad Traversy](https://gist.github.com/bradtraversy/a9dedcdf4350fd417819ee6538482aae).
 
 This project is a simple Node.js API that fetches GitHub user data and caches it using Redis. It helps reduce the number of requests made to the GitHub API by storing user data in Redis for one hour.
 
