@@ -1,59 +1,62 @@
-// Load environment variables from .env file
 import dotenv from 'dotenv';
-// Import Express framework
 import express from 'express';
-// Import node-fetch to make HTTP requests
 import fetch from 'node-fetch';
-// Import Redis client
 import { createClient } from 'redis';
 
-// Load environment variables
 dotenv.config();
 
-// Set the port for the Express server, default to 5002 if not specified
 const PORT = process.env.PORT || 5002;
-// Set the port for Redis, default to 6379 if not specified
 const REDIS_PORT = process.env.REDIS_PORT || 6379;
 
-// Log server startup
 console.log('Starting server.js...');
+console.log(`Connecting to Redis on port ${REDIS_PORT}...`);
 
-// Log Redis connection attempt
-console.log(`Attempting to connect to Redis on port ${REDIS_PORT}...`);
-
-// Initialize Redis client with async/await support
+// Create and configure Redis client
 const client = createClient({
   socket: { port: REDIS_PORT }
 });
 
-// Handle Redis client errors
+// Handle Redis connection errors
 client.on("error", (err) => console.log("Redis Client Error", err));
-// Connect to Redis server
+// Connect to Redis (async/await required at top-level)
 await client.connect();
 
-// Create an Express application
 const app = express();
 
-// Function to fetch user data from GitHub API and cache it in Redis
-async function getUserData(req, res, next) {
+// Middleware to check Redis cache before fetching from GitHub
+async function cache(req, res, next) {
+  const { username } = req.params;
   try {
-    // Log the username being fetched
-    console.log(`Fetching data from GitHub for user: ${req.params.username}`);
+    // Try to get cached data from Redis
+    const data = await client.get(username);
+    if (data) {
+      console.log(`Cache hit: ${username}`);
+      // If found, return cached data
+      res.json(JSON.parse(data));
+    } else {
+      console.log(`Cache miss: ${username}`);
+      // If not found, proceed to fetch from GitHub
+      next();
+    }
+  } catch (err) {
+    console.error('Redis error:', err);
+    next(err);
+  }
+}
 
-    // Extract username from request parameters
+// Route handler to fetch user data from GitHub and cache it in Redis
+async function getUserData(req, res) {
+  try {
     const { username } = req.params;
+    console.log(`Fetching GitHub data for: ${username}`);
 
-    // Make a GET request to GitHub API for the user
+    // Fetch user data from GitHub API
     const response = await fetch(`https://api.github.com/users/${username}`, {
-        headers: { 'User-Agent': 'node.js' }
+      headers: { 'User-Agent': 'node.js' }
     });
-    // Parse the response as JSON
     const data = await response.json();
 
-    // Log the raw data received from GitHub
-    console.log(data)
-
-    // Select and format the user data to return
+    // Prepare user data object
     const userData = {
       username: data.login,
       name: data.name,
@@ -65,53 +68,21 @@ async function getUserData(req, res, next) {
       avatar_url: data.avatar_url,
     };
 
-    // Cache the user data in Redis as a stringified JSON, expires in 1 hour
-    await client.set(username, JSON.stringify(userData), { EX: 3600 });
-    console.log(`Cached data for user: ${username} (expires in 1 hour)`);
+    // Cache the user data in Redis for 1 minute (EX: 60 seconds)
+    await client.set(username, JSON.stringify(userData), { EX: 60 });
 
-    // Send the user data as JSON response
+    console.log(`Cached: ${username}`);
     res.json(userData);
   } catch (err) {
-    // Handle errors and send a 500 response
-    console.error('Error in getUserData:', err);
+    console.error('Error:', err);
     res.status(500).json({ error: 'Something went wrong' });
   }
 }
 
-// Middleware to check Redis cache before making GitHub API request
-async function cache(req, res, next) {
-  // Extract username from request parameters
-  const { username } = req.params;
-  // Log cache check
-  console.log(`Checking cache for user: ${username}`);
-  try {
-    // Try to get cached data from Redis
-    const data = await client.get(username);
-    if (data !== null) {
-      // If cache hit, log and return cached data
-      console.log(`Cache hit for user: ${username}`);
-      res.json(JSON.parse(data));
-    } else {
-      // If cache miss, log and proceed to next middleware
-      console.log(`Cache miss for user: ${username}`);
-      next();
-    }
-  } catch (err) {
-    // Handle Redis errors and proceed to next middleware
-    console.error('Redis error in cache middleware:', err);
-    next(err);
-  }
-}
-
-// Route to get user data, uses cache middleware first
+// Main route: checks cache first, then fetches from GitHub if needed
 app.get('/user/:username', cache, getUserData);
-// Simple hello route for testing
-app.get('/hello', (req, res) => {
-  res.send('hello');
-});
+app.get('/hello', (req, res) => res.send('hello'));
 
-// Start the Express server and listen on the specified port
 app.listen(PORT, () => {
   console.log(`App listening on port ${PORT}`);
-  console.log('Ready to accept requests!');
 });

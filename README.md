@@ -11,6 +11,10 @@ This project is a simple Node.js API that fetches GitHub user data and caches it
 brew install redis
 brew services start redis
 ```
+or
+```bash
+redis-server
+```
 
 ### Ubuntu/Debian (using apt)
 ```bash
@@ -62,6 +66,11 @@ You should see: `PONG`
 5. **Start the server:**
    ```bash
    node server.js
+   ```
+   
+   **Or, start with automatic restarts using nodemon:**
+   ```bash
+   npx nodemon server.js
    ```
 
 ## Usage
